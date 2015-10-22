@@ -33,20 +33,26 @@ for elements in IDs:
         #print regex
         
         if re.search(regex,header):
-                out = re.findall(regex, header)
+                out = re.findall(regex, header, re.IGNORECASE)
                 matches.append(out)
         else:
-                
-                print elements.rstrip() 
+                next
+                #print elements.rstrip() 
 
 extract = list(itertools.chain(*matches))
 
+
+
 ###################################################################### extract the index of every match ##########################################################
-        
+
 for elements in extract:
-        tmp = a.index(elements)
-        columns.append(tmp)
-        
+        try:
+                tmp = a.index(elements)
+                columns.append(tmp)
+        except:
+                next
+
+
 
 with open(dosage) as g:
         for lines in g:
