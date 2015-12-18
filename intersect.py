@@ -32,10 +32,10 @@ f1=open('Intersect.snps', 'w+')
 f1.write("\n".join(intersect))
 f1.close()
 
-f1=open('Namikonga.snps', 'w+')
+f1=open('Namikonga_uniq.snps', 'w+')
 f1.write("\n".join(Namikonga))
 f1.close()
 
-f1=open('Alberts.snps', 'w+')
+f1=open('Alberts_uniq.snps', 'w+')
 f1.write("\n".join(Alberts))
 f1.close()
