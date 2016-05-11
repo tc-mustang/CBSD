@@ -10,8 +10,8 @@ threshold = sys.argv[2]
 IDs = list()
 f1=open('tmp', 'w+')
 
-with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/SNPs.bed") as g:  # when using all the markers without filter
-#with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/CBSD.snps.bed") as g:
+#with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/SNPs.bed") as g:  # when using all the markers without filter
+with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/CBSD.snps.bed") as g:
     for lines in g:        
         a = lines.split("\t")
         
