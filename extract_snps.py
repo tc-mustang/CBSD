@@ -11,9 +11,8 @@ IDs = list()
 f1=open('tmp', 'w+')
 
 #with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/SNPs.bed") as g:  # when using all the markers without filter
-with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/CBSD.snps.bed") as g:
-    for lines in g:        
-        a = lines.split("\t")
+#with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/CBSD.snps.bed") as g:
+
         
 with open(list_genes) as h:
     for lines in h:
@@ -35,7 +34,8 @@ with open("/home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/gff.bed"
 
 f1.close()
 
-os.system("bedtools intersect -a tmp -b /home/DB/M.esculenta/V6_assembly/Annotation/V6_official/SNPs/SNPs.bed  -wa -wb > %s.intersect" %(list_genes))
+os.system("bedtools intersect -a tmp -b /home/DB2/Imputation/BEAGLE_imputation/CBSD/Imputed/CBSD_dataset/WGI_CBSD_snps.bed  -wa -wb > %s.intersect" %(list_genes))
+#os.system("bedtools intersect -a tmp -b /home/DB2/Imputation/BEAGLE_imputation/CBSD/Imputed/CBSD_dataset/gbs_snps.bed  -wa -wb > %s.intersect" %(list_genes))
 os.system("awk -F\"\t\"  '{print$8}' %s.intersect | sort -n | uniq > %s.snps" %(list_genes, list_genes))
 
 os.system("rm tmp")
