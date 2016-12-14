@@ -1,1 +1,687 @@
-/home/roberto/Desktop/JL-Presentation/PAG_2017/Code/CBSD_transcriptomics.Rmd
+---
+title: "CBSD Transcriptomics"
+output: html_notebook
+---
+
+
+GENOTYPE FILES:
+
+Formatting the GBS Dosage file:
+Extracted from GBS_CBSD.vcf.gz containing 986 individuals and 41 530 SNPs
+
+```{r, echo=TRUE, warning=TRUE}
+
+GBS <- read.delim("/home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/DOSAGES/GBS_CBSD.DS.FORMAT")
+
+GBS[,1] <- paste("S",GBS[,1],"_", GBS[,2], sep="")
+rownames(GBS) <- GBS[,1]
+
+GBS <- GBS[,-1]
+GBS <- GBS[,-1]
+GBS <- t(GBS)
+
+#remove the dots in the rownames
+
+rows <- vector()
+for (i in 1:length(rownames(GBS))) {
+  rows <- c(rows, strsplit(rownames(GBS)[i], ".", fixed =T)[[1]][1])
+}
+rownames(GBS) <- rows
+
+
+# save the file as an R object
+
+save(GBS, file="/home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/DOSAGES/CBSD_GBS.Rdata")
+
+
+
+```
+
+
+PHENOTYPE FILES:
+
+Load Phenotype files
+955 individuals with phenotypes. All individuals has phenotypes.
+
+```{r}
+
+##  Load phenotypic Data (Already Filter no missings or extras)
+CBSD_pheno <- read.delim("~/Desktop/JL-Presentation/PAG_2017/Phenotypes/CBSD_6MAP_GWAS_TP", stringsAsFactors = F)
+
+```
+
+
+DESCRIBING THE POPULATION:
+
+1) Make LD score plots for all chromosomes. It describes the Local LD and funny things happening on cassava
+
+  Calculate LD plots
+```{bash, eval=FALSE}
+
+# Plink files for the GBS_CBSD.vcf.gz on :
+# /home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/PLINK
+
+# Calculate LDscore for each SNP 
+
+gcta64 --bfile /home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/PLINK/plink --ld-score --ld-wind 1000 --ld-score-adj --out /home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/PLINK/CBDS_LDscore
+
+
+```
+
+  Make a plot 
+```{r}
+
+LDscore <- read.delim("/home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/PLINK/LDscore.ld", sep = " ")
+
+LDscore_r <- LDscore[,-(4:7)]
+mean_LD <- LDscore[,-c(4,6:8)]
+colnames(LDscore_r) <- c("SNP","CHR", "BP", "ldscore")
+colnames(mean_LD) <- c("SNP","CHR", "BP", "ldscore")
+
+library(qqman)
+manhattan(LDscore_r, p = "ldscore", logp = FALSE, ylab = "LDscore", genomewideline = FALSE, col = c("dodgerblue4", "forestgreen"), cex=0.3,
+    suggestiveline = FALSE, main = "LDscores")
+
+
+manhattan(mean_LD, p = "ldscore", logp = FALSE, ylab = "LDscore", genomewideline = FALSE, col = c("dodgerblue4", "forestgreen"), cex=0.3,
+    suggestiveline = FALSE, main = "LDscores")
+
+```
+
+  Make a plot for just chromosome 4
+
+```{r}
+
+library(wesanderson)
+library(ggplot2)
+
+
+
+##########  LD data  #########
+
+chr4 <- mean_LD[which(mean_LD[,2]==4),]
+chr4L <- LDscore_r[which(mean_LD[,2]==4),]
+chr4[,5] <- chr4L[,4]
+colnames(chr4) <- c("SNP", "CHR", "BP", "ldscore", "LDscore")
+
+########## GWAS data #########
+
+GWAS <- read.delim("/home/roberto/Desktop/CBSD-GS/NEW/NBS_V6/CIRCOS/running_circos/practice/heatmap/GWAS/LEAVES6", header = F)
+GWAS4 <- GWAS[which(GWAS[,1] == "ms4"),]
+
+save(chr4_short, file = "/home/roberto/Desktop/chr4_short")
+colnames(chr4_short) <- c("SNP", "CHR", "BP", "ldscore", "LDscore", "log10Pval")
+
+p <- ggplot(chr4_short, aes(BP/1000000, ldscore))
+p + stat_smooth(colour = "lightgrey") + geom_point(size=0.75, alpha =1/1, aes(colour = log10Pval)) + scale_colour_gradient(low = "orange", high = "darkgreen", trans = "sqrt") + theme_bw() + ylim(0,0.6) + 
+  labs(x="SNP position (Mb)",
+       y = "mean LDscores", 
+       title= "Chromosome 4 LD landscape") +
+  
+  theme(                              
+    axis.title.x = element_text(face="bold", color="black", size=10),
+    axis.title.y = element_text(face="bold", color="black", size=10),
+    plot.title = element_text(face="bold", color = "black", size=12),
+    legend.title = element_text(size=9),
+    legend.position=c(1.015,1),
+    legend.justification=c(1,1))
+
+
+```
+
+2) Make a regular LD decay PLOT
+
+
+
+3) MAF Distribution
+
+
+
+
+4) PCA Plot
+
+
+
+
+GENOMIC PREDICTION USING THE DIFFERENT GENOTYPE DATASETS
+
+1) GBS 41.5K markers
+
+  Load GENO & PHENO
+```{r}
+
+#load genotype files
+load("/home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/DOSAGES/CBSD_GBS.Rdata")
+
+##  Load phenotypic Data (Already Filter no missings or extras)
+CBSD_pheno <- read.delim("~/Desktop/JL-Presentation/PAG_2017/Phenotypes/CBSD_6MAP_GWAS_TP", stringsAsFactors = F)
+
+```
+
+  Run Genomic prediction 6MAP with GBS
+```{r}
+
+source("/home/roberto/Desktop/JL-Presentation/PAG_2017/Code/GBLUP_functions.R")
+
+library(rrBLUP)
+library(foreach)
+library(doParallel)
+
+K <- A.mat(GBS-1)
+
+traits<-c("cbsd6s")
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+GBS <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(K),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+```
+
+  Plot the accuracies obtained
+  
+  * Create a data frame with the accuracy values
+```{r}
+
+# Create an empty dataframe
+df <- as.data.frame(matrix(0, ncol = 2, nrow = 25))
+
+# Add some column names
+colnames(df) <- c("Accuracy", "Kernel")
+
+#Populate with the Accuracies
+df[,1] <- GBS[[1]]$accuracies[,3]
+
+#Only one kernel so:
+df[,2] <- "GBS"
+
+```
+  
+  * Use ggplot to get the boxplot
+```{r}
+
+library(ggplot2)
+require(reshape2)
+
+p <- ggplot(df, aes(factor(Kernel), Accuracy))
+p + geom_boxplot(aes(fill = Kernel)) + labs(title="GBS 6MAP Accuracy", x="Genotype set") +  theme_bw() +
+  theme(plot.title=element_text(colour = "navyblue",face ="bold", size= 18, margin = margin(t=20, b=20)),
+        axis.title.y=element_text(margin=margin(0,20,0,0)),
+        axis.text=element_text(size=15), 
+        axis.title=element_text(size=20,face="bold"),
+        axis.title.x=element_text(margin=margin(20,0,0,0))) 
+
+```
+
+2) GBS 41.5K markers 3 phenotypes
+```{r}
+
+#load genotype files
+load("/home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/DOSAGES/CBSD_GBS.Rdata")
+
+##  Load phenotypic Data (Already Filter no missings or extras)
+CBSD_pheno <- read.delim("~/Desktop/JL-Presentation/PAG_2017/Phenotypes/Phenos.txt", stringsAsFactors = F)
+
+source("/home/roberto/Desktop/JL-Presentation/PAG_2017/Code/GBLUP_functions.R")
+
+library(rrBLUP)
+library(foreach)
+library(doParallel)
+
+K <- A.mat(GBS-1)
+
+traits<-c("CBSD3S","CBSD6S","CBSDRS")
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+GBS_3 <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(K),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+```
+
+
+
+```{r}
+
+# Create an empty dataframe
+df <- as.data.frame(matrix(0, ncol = 2, nrow = 75))
+
+# Add some column names
+colnames(df) <- c("Accuracy", "Kernel")
+
+#Populate with the Accuracies
+df[1:25,1] <- GBS_3[[1]]$accuracies[,3]
+df[26:50,1] <- GBS_3[[2]]$accuracies[,3]
+df[51:75,1] <- GBS_3[[3]]$accuracies[,3]
+
+
+#Only one kernel so:
+df[1:25,2] <- "3MAP"
+df[26:50,2] <- "6MAP"
+df[51:75,2] <- "ROOTS"
+```
+
+
+```{r}
+
+library(ggplot2)
+require(reshape2)
+
+p <- ggplot(df, aes(factor(Kernel), Accuracy))
+p + geom_boxplot(aes(fill = Kernel)) + labs(title="GBS 6MAP Accuracy", x="Genotype set") +  theme_bw() +
+  theme(plot.title=element_text(colour = "navyblue",face ="bold", size= 18, margin = margin(t=20, b=20)),
+        axis.title.y=element_text(margin=margin(0,20,0,0)),
+        axis.text=element_text(size=15), 
+        axis.title=element_text(size=20,face="bold"),
+        axis.title.x=element_text(margin=margin(20,0,0,0))) 
+
+```
+
+Same with IMPUTE2 results:
+
+
+``` {r}
+
+#load IMPUTE2 GRM (300Gb)
+load("/home/roberto/Desktop/JL-Presentation/PAG_2017/Genotypes/IMPUTE2/I2GRM.Rdata")
+
+source("/home/roberto/Desktop/JL-Presentation/PAG_2017/Code/GBLUP_functions.R")
+
+traits<-c("CBSD3S","CBSD6S","CBSDRS")
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+GBS_3 <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(I2_GRM),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+
+# Create an empty dataframe
+df <- as.data.frame(matrix(0, ncol = 2, nrow = 75))
+
+# Add some column names
+colnames(df) <- c("Accuracy", "Kernel")
+
+#Populate with the Accuracies
+df[1:25,1] <- GBS_3[[1]]$accuracies[,3]
+df[26:50,1] <- GBS_3[[2]]$accuracies[,3]
+df[51:75,1] <- GBS_3[[3]]$accuracies[,3]
+
+
+#Only one kernel so:
+df[1:25,2] <- "3MAP"
+df[26:50,2] <- "6MAP"
+df[51:75,2] <- "ROOTS"
+
+
+library(ggplot2)
+require(reshape2)
+
+p <- ggplot(df, aes(factor(Kernel), Accuracy))
+p + geom_boxplot(aes(fill = Kernel)) + labs(title="GBS 6MAP Accuracy", x="Genotype set") +  theme_bw() +
+  theme(plot.title=element_text(colour = "navyblue",face ="bold", size= 18, margin = margin(t=20, b=20)),
+        axis.title.y=element_text(margin=margin(0,20,0,0)),
+        axis.text=element_text(size=15), 
+        axis.title=element_text(size=20,face="bold"),
+        axis.title.x=element_text(margin=margin(20,0,0,0))) 
+
+
+
+```
+
+
+Reproduce the slide "Impact of Imputation on accuracy"
+
+```{r}
+
+## Load the 4 Genomic Relationship Matrix
+
+#KGBS
+load(file = "/home/roberto/Desktop/JL-Presentation/PAG_2017/Results/2.Impact_imputation/GBS61K.RData")
+
+#KS1
+load(file = "/home/roberto/Desktop/JL-Presentation/PAG_2017/Results/2.Impact_imputation/stage1GRM.Rdata")
+
+#KS2
+load(file = "/home/roberto/Desktop/JL-Presentation/PAG_2017/Results/2.Impact_imputation/stage2GRM.RData")
+
+#I2_GRM
+load(file = "/home/roberto/Desktop/JL-Presentation/PAG_2017/Results/2.Impact_imputation/I2GRM.Rdata")
+
+
+
+## GBS ##
+
+traits<-c("CBSD6S")
+
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+GBS_CBSD <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(KGBS),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+## Stage1 ##
+
+# Eliminate the sequencing IDs first
+
+rows <- vector()
+for (i in 1:length(colnames(KS1))) {
+  rows <- c(rows, strsplit(colnames(KS1)[i], ".", fixed =T)[[1]][1])
+}
+
+colnames(KS1) <- rows
+rownames(KS1) <- rows
+
+traits<-c("CBSD6S")
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+Stage1_CBSD <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(KS1),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+
+## Stage2 ##
+
+traits<-c("CBSD6S")
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+Stage2_CBSD <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(KS2),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+## Impute2 ##
+
+traits<-c("CBSD6S")
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+Impute2_CBSD <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(I2_GRM),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+
+```
+
+
+GRAPHS
+
+```{r}
+
+
+# NEW GBS
+GBSdf <- matrix(0, nrow=25, ncol = 3) 
+colnames(GBSdf) <- c("Accuracy", "Set", "Kernels")
+GBSdf[,1] <- as.numeric(GBS_CBSD[[1]]$accuracies[,3])
+GBSdf[,2] <- "GBS"
+GBSdf[,3] <- "NN"
+
+
+# OLD GBS vector from ~/Desktop/JL-Presentation/Accuracies##
+vector <- c(0.39,0.42,0.40,0.39,0.40,0.40,0.38,0.40,0.39,0.38,0.367,0.4,0.409,0.398,0.3849,0.3865, 0.3924, 0.3973, 0.3847, 0.4132, 0.3728, 0.3818, 0.4088, 0.39,0.3831)
+GBSdf[,1] <- as.numeric(vector)
+GBSdf[,2] <- "GBS"
+GBSdf[,3] <- "NN"
+
+Stage1 <- matrix(0, nrow=25, ncol = 3) 
+colnames(Stage1) <- c("Accuracy", "Set", "Kernels")
+Stage1[,1] <- as.numeric(Stage1_CBSD[[1]]$accuracies[,3])
+Stage1[,2] <- "WGI-1"
+Stage1[,3] <- "NN"
+
+Stage2 <- matrix(0, nrow=25, ncol = 3) 
+colnames(Stage2) <- c("Accuracy", "Set", "Kernels")
+Stage2[,1] <- as.numeric(Stage2_CBSD[[1]]$accuracies[,3])
+Stage2[,2] <- "WGI-2"
+Stage2[,3] <- "NN"
+
+Impute2 <- matrix(0, nrow=25, ncol = 3) 
+colnames(Impute2) <- c("Accuracy", "Set", "Kernels")
+Impute2[,1] <- as.numeric(Impute2_CBSD[[1]]$accuracies[,3])
+Impute2[,2] <- "Impute2"
+Impute2[,3] <- "NN"
+
+
+graph <- rbind(GBSdf, Stage1, Stage2, Impute2)
+acc <- as.numeric(graph[,1])
+
+graph <- as.data.frame(graph)
+graph[,1] <- acc
+
+
+library(ggplot2)
+require(reshape2)
+library(wesanderson)
+
+graph$Set <- factor(graph$Set, levels=c("GBS", "WGI-1", "WGI-2", "Impute2"))
+
+
+p <- ggplot(graph, aes(factor(Set), Accuracy))
+p + geom_boxplot(aes(fill = Set)) + labs(title="GBS 6MAP Accuracy", x="Imputation level") +  theme_bw() +
+  scale_fill_manual(values = wes_palette("Zissou")) +
+  theme(plot.title=element_text(colour = "navyblue",face ="bold", size= 18, margin = margin(t=20, b=20)),
+        axis.title.y=element_text(margin=margin(0,20,0,0)),
+        axis.text=element_text(size=15), 
+        axis.title=element_text(size=20,face="bold"),
+        axis.title.x=element_text(margin=margin(20,0,0,0))) 
+
+
+
+```
+
+
+
+3) Keep track of chromosome 11 and 4 is useful
+
+
+* Random chromosomes
+All the Rdata will be saved in the "3.Keeping_track" folder
+
+```{r}
+
+setwd("~/Desktop/JL-Presentation/Gene_lists/random_chr")
+
+load("RM_chr1.Rdata")
+load("RM_chr2.Rdata")
+load("RM_chr3.Rdata")
+load("RM_chr5.Rdata")
+load("RM_chr6.Rdata")
+load("RM_chr7.Rdata")
+load("RM_chr8.Rdata")
+load("RM_chr9.Rdata")
+load("RM_chr10.Rdata")
+load("RM_chr12.Rdata")
+load("RM_chr13.Rdata")
+load("RM_chr14.Rdata")
+load("RM_chr15.Rdata")
+load("RM_chr16.Rdata")
+load("RM_chr17.Rdata")
+load("RM_chr18.Rdata")
+
+which(colnames(A.chr8) %in% CBSD_pheno[,1])
+
+take <- c(1,2,3,5,6,7,8,9,10,12,13,14,15,16,17,18)
+sample(take, 2, replace = F)
+
+
+traits<-c("CBSD3S","CBSD6S","CBSDRS")
+
+library(foreach)
+library(doParallel)
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+a2 <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(A.chr6, A.chr7),5,1)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+#Save every iteration as 
+save(a2, file = "/home/roberto/Desktop/JL-Presentation/PAG_2017/Results/3.Keeping_track/i25")
+
+
+```
+
+
+```{r}
+#Put every iteration into one row of the varcomp matrix
+
+varcomp3 <- matrix(0,nrow = 25, ncol = 9) 
+colnames(varcomp3) <- names(a2[[1]]$varcomps[1,])
+
+varcomp6 <- matrix(0,nrow = 25, ncol = 9) 
+colnames(varcomp6) <- names(a2[[1]]$varcomps[1,])
+
+varcompR <- matrix(0,nrow = 25, ncol = 9) 
+colnames(varcompR) <- names(a2[[1]]$varcomps[1,])
+
+a2[[2]]$varcomps
+
+
+```
+
+* Chromosomes 4 and 11
+All the Rdata will be saved in the "3.Keeping_track" folder "foureleven"
+
+```{r}
+
+load("/home/roberto/Desktop/JL-Presentation/Gene_lists/RM/RM_chr4.RData")
+load("/home/roberto/Desktop/JL-Presentation/Gene_lists/RM/RM_chr11.RData")
+
+traits<-c("CBSD3S","CBSD6S","CBSDRS")
+
+library(foreach)
+library(doParallel)
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+a2 <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(A.chr4, A.chr11),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+#Save as 
+save(a2, file = "/home/roberto/Desktop/JL-Presentation/PAG_2017/Results/3.Keeping_track/foureleven/foureleven.RData")
+
+```
+
+4) Anything anywhere else
+All the Rdata will be saved in the "4.Anything_anywhere" folder "EE"
+
+
+```{r}
+
+# load dosage for everything but...
+
+EE <- read.delim("/home/roberto/Desktop/JL-Presentation/Gene_lists/random_chr/tmp/EE.dosage", header = T)
+
+EE[,1] <- paste("S",EE[,1],"_", EE[,2], sep="") 
+rownames(EE) <- EE[,1]
+EE <- EE[,-1]
+EE <- EE[,-1]
+
+EE <- t(EE)
+EE[1:3, 1:3]
+
+#remove the dots in the rownames
+
+rows <- vector()
+for (i in 1:length(rownames(EE))) {
+  rows <- c(rows, strsplit(rownames(EE)[i], ".", fixed =T)[[1]][1])
+}
+rownames(EE) <- rows
+
+save(EE, file="EE.dosage.RDATA")
+load("/home/roberto/Desktop/JL-Presentation/PAG_2017/Code/EE.dosage.RDATA")
+
+library(rrBLUP)
+GRM_EE <- A.mat(EE-1)
+
+load("/home/roberto/Desktop/JL-Presentation/Gene_lists/random_chr/tmp/EE.GRM.RData")
+load("/home/roberto/Desktop/JL-Presentation/Gene_lists/RM/RM_chr4.RData")
+load("/home/roberto/Desktop/JL-Presentation/Gene_lists/RM/RM_chr11.RData")
+
+traits<-c("CBSD3S","CBSD6S","CBSDRS")
+
+library(foreach)
+library(doParallel)
+proctime<-proc.time()
+cl<-makeCluster(6)
+registerDoParallel(cl)
+
+a2 <- foreach(a=traits, virus=icount(), .inorder=TRUE) %dopar% {
+  require(EMMREML)
+  crossval<-FoldCrossValidation.V3.emmreml(CBSD_pheno,traits[virus],"CLONE",list(A.chr4, A.chr11, GRM_EE),5,25)
+}
+
+stopCluster(cl)
+proc.time() - proctime
+
+#Save as 
+save(a2, file = "/home/roberto/Desktop/JL-Presentation/PAG_2017/Results/4.Anything_anywhere/EE/EE.RData")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
