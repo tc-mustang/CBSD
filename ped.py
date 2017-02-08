@@ -10,5 +10,5 @@ with open(ped_file) as h:
         a = lines.rstrip().split("\t")
         first = a[0].split(':')[0]
         second = a[2:]
-        print first+"\t"+first + "\t" +"\t".join(second)
+        print "1"+"\t"+first + "\t" +"\t".join(second)
         
